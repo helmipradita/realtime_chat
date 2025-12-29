@@ -1,19 +1,20 @@
 "use client";
 
 import { useUsername } from "@/hooks/use-username";
+import { useLicense } from "@/hooks/use-license";
 import { client } from "@/lib/client";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { MessageSquare, CreditCard, Clock, Shield, Users, Zap } from "lucide-react";
+import { MessageSquare, CreditCard, Clock, Shield, Users, Zap, Eye, EyeOff } from "lucide-react";
 
 const TTL_OPTIONS = [
-	{ label: "10 menit", value: 10 * 60, tier: "free" },
-	{ label: "30 menit", value: 30 * 60, tier: "pro" },
-	{ label: "1 jam", value: 60 * 60, tier: "pro" },
-	{ label: "6 jam", value: 6 * 60 * 60, tier: "pro" },
+	{ label: "10 min", value: 10 * 60, tier: "free" },
+	{ label: "30 min", value: 30 * 60, tier: "pro" },
+	{ label: "1 hour", value: 60 * 60, tier: "pro" },
+	{ label: "6 hours", value: 6 * 60 * 60, tier: "pro" },
 ] as const;
 
 const Page = () => {
@@ -26,13 +27,14 @@ const Page = () => {
 
 function Lobby() {
 	const { username } = useUsername();
+	const { isPro, activateLicense, isLoading: isLicenseLoading } = useLicense();
 	const router = useRouter();
 	const [selectedTTL, setSelectedTTL] = useState(TTL_OPTIONS[0].value);
 	const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 	const [passwordEnabled, setPasswordEnabled] = useState(false);
-
-	// TODO: Get from auth/subscription system
-	const [userPlan] = useState<"free" | "pro">("free");
+	const [roomPassword, setRoomPassword] = useState("");
+	const [showPassword, setShowPassword] = useState(false);
+	const [customUsername, setCustomUsername] = useState("");
 
 	const searchParams = useSearchParams();
 	const wasDestroyed = searchParams.get("destroyed") === "true";
@@ -40,10 +42,17 @@ function Lobby() {
 
 	const { mutate: createRoom, isPending } = useMutation({
 		mutationFn: async () => {
-			const res = await client.room.create.post({ ttl: selectedTTL });
+			const res = await client.room.create.post({ 
+				ttl: selectedTTL,
+				password: passwordEnabled && roomPassword ? roomPassword : undefined,
+			});
 
-			if (res.status === 200) {
-				router.push(`/room/${res.data?.roomId}`);
+			if (res.status === 200 && res.data?.roomId) {
+				// If room has password, set verified cookie for creator
+				if (passwordEnabled && roomPassword) {
+					document.cookie = `room-verified-${res.data.roomId}=true; path=/; max-age=86400; samesite=strict`;
+				}
+				router.push(`/room/${res.data.roomId}`);
 			}
 
 			return res;
@@ -54,7 +63,7 @@ function Lobby() {
 	});
 
 	const handleTTLSelect = (option: (typeof TTL_OPTIONS)[number]) => {
-		if (option.tier === "pro" && userPlan === "free") {
+		if (option.tier === "pro" && !isPro) {
 			setShowUpgradeModal(true);
 			return;
 		}
@@ -62,11 +71,15 @@ function Lobby() {
 	};
 
 	const handlePasswordToggle = () => {
-		if (userPlan === "free") {
+		if (!isPro) {
 			setShowUpgradeModal(true);
 			return;
 		}
 		setPasswordEnabled(!passwordEnabled);
+	};
+
+	const handleUpgradeSuccess = async (licenseKey: string) => {
+		await activateLicense(licenseKey);
 	};
 
 	return (
@@ -145,16 +158,22 @@ function Lobby() {
 						<div className="flex items-center justify-between mb-6">
 							<span className="text-zinc-500 font-mono text-sm">Plan:</span>
 							<div className="flex items-center gap-2">
-								<span className="text-white font-mono text-sm">
-									{userPlan === "pro" ? "Pro ✓" : "Free"}
-								</span>
-								{userPlan === "free" && (
-									<Link
-										href="/pricing"
-										className="text-green-500 font-mono text-sm hover:underline"
-									>
-										Upgrade
-									</Link>
+								{isLicenseLoading ? (
+									<span className="text-zinc-500 font-mono text-sm">Loading...</span>
+								) : (
+									<>
+										<span className={`font-mono text-sm ${isPro ? "text-green-500" : "text-white"}`}>
+											{isPro ? "Pro ✓" : "Free"}
+										</span>
+										{!isPro && (
+											<button
+												onClick={() => setShowUpgradeModal(true)}
+												className="text-green-500 font-mono text-sm hover:underline"
+											>
+												Upgrade
+											</button>
+										)}
+									</>
 								)}
 							</div>
 						</div>
@@ -166,7 +185,7 @@ function Lobby() {
 							</label>
 							<div className="grid grid-cols-2 gap-2">
 								{TTL_OPTIONS.map((option) => {
-									const isLocked = option.tier === "pro" && userPlan === "free";
+									const isLocked = option.tier === "pro" && !isPro;
 									const isSelected = selectedTTL === option.value;
 
 									return (
@@ -200,7 +219,7 @@ function Lobby() {
 							<div className="flex items-center justify-between">
 								<label className="flex items-center gap-2 text-zinc-500 font-mono text-sm">
 									<Shield className="w-4 h-4" /> Password Protection
-									{userPlan === "free" && (
+									{!isPro && (
 										<span className="bg-green-500/20 text-green-500 text-[10px] px-1.5 py-0.5 rounded font-bold">
 											PRO
 										</span>
@@ -221,12 +240,27 @@ function Lobby() {
 									/>
 								</button>
 							</div>
-							{passwordEnabled && userPlan === "pro" && (
-								<input
-									type="password"
-									placeholder="Masukkan password room"
-									className="w-full mt-3 bg-zinc-950 border border-zinc-800 p-3 font-mono text-sm text-zinc-400 placeholder:text-zinc-600"
-								/>
+							{passwordEnabled && isPro && (
+								<div className="relative mt-3">
+									<input
+										type={showPassword ? "text" : "password"}
+										value={roomPassword}
+										onChange={(e) => setRoomPassword(e.target.value)}
+										placeholder="Enter room password"
+										className="w-full bg-zinc-950 border border-zinc-800 p-3 pr-10 font-mono text-sm text-zinc-300 placeholder:text-zinc-600 focus:border-green-500/50 focus:outline-none"
+									/>
+									<button
+										type="button"
+										onClick={() => setShowPassword(!showPassword)}
+										className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+									>
+										{showPassword ? (
+											<EyeOff className="w-4 h-4" />
+										) : (
+											<Eye className="w-4 h-4" />
+										)}
+									</button>
+								</div>
 							)}
 						</div>
 
@@ -235,13 +269,22 @@ function Lobby() {
 							<label className="flex items-center gap-2 text-zinc-500 font-mono text-sm mb-3">
 								<Users className="w-4 h-4" /> Your Identity
 							</label>
-							<input
-								type="text"
-								value={username}
-								disabled={userPlan === "free"}
-								placeholder={userPlan === "pro" ? "Masukkan nama kamu" : ""}
-								className="w-full bg-zinc-950 border border-zinc-800 p-3 font-mono text-sm text-zinc-400 placeholder:text-zinc-600 disabled:cursor-not-allowed"
-							/>
+							{isPro ? (
+								<input
+									type="text"
+									value={customUsername || username}
+									onChange={(e) => setCustomUsername(e.target.value)}
+									placeholder="Enter your name"
+									className="w-full bg-zinc-950 border border-zinc-800 p-3 font-mono text-sm text-zinc-300 placeholder:text-zinc-600"
+								/>
+							) : (
+								<input
+									type="text"
+									value={username}
+									disabled
+									className="w-full bg-zinc-950 border border-zinc-800 p-3 font-mono text-sm text-zinc-400 disabled:cursor-not-allowed"
+								/>
+							)}
 						</div>
 
 						{/* Create Button */}
@@ -255,7 +298,10 @@ function Lobby() {
 
 						{/* Info */}
 						<p className="text-center text-zinc-600 font-mono text-xs mt-4">
-							Max 2 peserta per room • 3 rooms per hari
+							{isPro 
+								? "Max 5 participants per room • Unlimited rooms" 
+								: "Max 2 participants per room • 3 rooms per day"
+							}
 						</p>
 					</div>
 				</div>
@@ -271,7 +317,7 @@ function Lobby() {
 							</div>
 							<h3 className="font-mono text-white mb-2">End-to-End Encrypted</h3>
 							<p className="font-mono text-zinc-500 text-sm">
-								Pesan dienkripsi dan tidak bisa dibaca siapapun.
+								Messages are encrypted and cannot be read by anyone.
 							</p>
 						</div>
 						<div>
@@ -280,7 +326,7 @@ function Lobby() {
 							</div>
 							<h3 className="font-mono text-white mb-2">Self-Destructing</h3>
 							<p className="font-mono text-zinc-500 text-sm">
-								Room otomatis terhapus setelah TTL berakhir.
+								Room automatically deleted after TTL expires.
 							</p>
 						</div>
 						<div>
@@ -289,7 +335,7 @@ function Lobby() {
 							</div>
 							<h3 className="font-mono text-white mb-2">Real-time</h3>
 							<p className="font-mono text-zinc-500 text-sm">
-								Pesan terkirim secara instan tanpa delay.
+								Messages delivered instantly without delay.
 							</p>
 						</div>
 					</div>
@@ -300,6 +346,7 @@ function Lobby() {
 			<UpgradeModal
 				isOpen={showUpgradeModal}
 				onClose={() => setShowUpgradeModal(false)}
+				onSuccess={handleUpgradeSuccess}
 			/>
 		</main>
 	);

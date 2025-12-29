@@ -4,10 +4,87 @@ import { nanoid } from "nanoid";
 import { authMiddleware } from "./auth";
 import { z } from "zod";
 import { Message, realtime } from "@/lib/realtime";
+import { generateLicenseKey, saveLicense, validateLicense, getLicenseByEmail } from "@/lib/license";
 
 const DEFAULT_TTL_SEC = 60 * 10; // 10 minutes
 const MIN_TTL_SEC = 60 * 5; // 5 minutes
 const MAX_TTL_SEC = 60 * 60 * 6; // 6 hours
+
+// License/Subscription endpoints
+const license = new Elysia({ prefix: "/license" })
+	.post("/validate", async ({ body }) => {
+		const { licenseKey } = body;
+		const result = await validateLicense(licenseKey);
+		
+		if (result.valid && result.data) {
+			return {
+				valid: true,
+				email: result.data.email,
+				expiresAt: result.data.expiresAt,
+				status: result.data.status,
+			};
+		}
+		
+		return { valid: false };
+	}, {
+		body: z.object({
+			licenseKey: z.string(),
+		}),
+	})
+	.post("/create", async ({ body }) => {
+		// This would normally be called after Xendit payment webhook
+		// For now, we'll create a simple endpoint for testing
+		const { email } = body;
+		
+		// Check if email already has a license
+		const existing = await getLicenseByEmail(email);
+		if (existing && existing.data.status === "active") {
+			return {
+				success: false,
+				error: "Email already has an active license",
+				licenseKey: existing.key,
+			};
+		}
+		
+		const licenseKey = generateLicenseKey();
+		const now = Date.now();
+		const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+		
+		await saveLicense(licenseKey, {
+			email,
+			createdAt: now,
+			expiresAt: now + thirtyDays,
+			status: "active",
+		});
+		
+		return {
+			success: true,
+			licenseKey,
+			expiresAt: now + thirtyDays,
+		};
+	}, {
+		body: z.object({
+			email: z.email(),
+		}),
+	})
+	.post("/check-email", async ({ body }) => {
+		const { email } = body;
+		const existing = await getLicenseByEmail(email);
+		
+		if (existing && existing.data.status === "active") {
+			return {
+				hasLicense: true,
+				licenseKey: existing.key,
+				expiresAt: existing.data.expiresAt,
+			};
+		}
+		
+		return { hasLicense: false };
+	}, {
+		body: z.object({
+			email: z.email(),
+		}),
+	});
 
 const rooms = new Elysia({ prefix: "/room" })
 	.post("/create", async ({ body }) => {
@@ -17,19 +94,68 @@ const rooms = new Elysia({ prefix: "/room" })
 		let ttl = body?.ttl ?? DEFAULT_TTL_SEC;
 		ttl = Math.max(MIN_TTL_SEC, Math.min(MAX_TTL_SEC, ttl));
 
-		await redis.hset(`meta:${roomId}`, {
+		const roomData: Record<string, unknown> = {
 			connected: [],
 			createdAt: Date.now(),
 			ttl: ttl,
-		});
+			hasPassword: !!body?.password,
+		};
 
+		// Store hashed password if provided
+		if (body?.password) {
+			// Simple hash for demo - in production use bcrypt
+			roomData.password = body.password;
+		}
+
+		await redis.hset(`meta:${roomId}`, roomData);
 		await redis.expire(`meta:${roomId}`, ttl);
 
-		return { roomId, ttl };
+		return { roomId, ttl, hasPassword: !!body?.password };
 	}, {
 		body: z.object({
 			ttl: z.number().optional(),
+			password: z.string().optional(),
 		}).optional(),
+	})
+	.post("/verify-password", async ({ body }) => {
+		const { roomId, password } = body;
+		
+		const meta = await redis.hgetall<{ password?: string; hasPassword?: boolean }>(`meta:${roomId}`);
+		
+		if (!meta) {
+			return { valid: false, error: "Room not found" };
+		}
+		
+		if (!meta.hasPassword) {
+			return { valid: true };
+		}
+		
+		if (meta.password === password) {
+			return { valid: true };
+		}
+		
+		return { valid: false, error: "Incorrect password" };
+	}, {
+		body: z.object({
+			roomId: z.string(),
+			password: z.string(),
+		}),
+	})
+	.get("/info", async ({ query }) => {
+		const { roomId } = query;
+		const meta = await redis.hgetall<{ hasPassword?: boolean; connected?: string[] }>(`meta:${roomId}`);
+		
+		if (!meta) {
+			return { exists: false };
+		}
+		
+		return {
+			exists: true,
+			hasPassword: !!meta.hasPassword,
+			participantCount: meta.connected?.length ?? 0,
+		};
+	}, {
+		query: z.object({ roomId: z.string() }),
 	})
 	.use(authMiddleware)
 	.get(
@@ -107,7 +233,7 @@ const messages = new Elysia({ prefix: "/messages" })
 		{ query: z.object({ roomId: z.string() }) }
 	);
 
-export const app = new Elysia({ prefix: "/api" }).use(rooms).use(messages);
+export const app = new Elysia({ prefix: "/api" }).use(license).use(rooms).use(messages);
 
 export const GET = app.fetch;
 export const POST = app.fetch;
