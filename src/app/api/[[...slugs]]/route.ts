@@ -5,20 +5,31 @@ import { authMiddleware } from "./auth";
 import { z } from "zod";
 import { Message, realtime } from "@/lib/realtime";
 
-const ROOM_TTL_SEC = 60 * 10;
+const DEFAULT_TTL_SEC = 60 * 10; // 10 minutes
+const MIN_TTL_SEC = 60 * 5; // 5 minutes
+const MAX_TTL_SEC = 60 * 60 * 6; // 6 hours
 
 const rooms = new Elysia({ prefix: "/room" })
-	.post("/create", async () => {
+	.post("/create", async ({ body }) => {
 		const roomId = nanoid();
+		
+		// Validate TTL: clamp between min and max
+		let ttl = body?.ttl ?? DEFAULT_TTL_SEC;
+		ttl = Math.max(MIN_TTL_SEC, Math.min(MAX_TTL_SEC, ttl));
 
 		await redis.hset(`meta:${roomId}`, {
 			connected: [],
 			createdAt: Date.now(),
+			ttl: ttl,
 		});
 
-		await redis.expire(`meta:${roomId}`, ROOM_TTL_SEC);
+		await redis.expire(`meta:${roomId}`, ttl);
 
-		return { roomId };
+		return { roomId, ttl };
+	}, {
+		body: z.object({
+			ttl: z.number().optional(),
+		}).optional(),
 	})
 	.use(authMiddleware)
 	.get(
