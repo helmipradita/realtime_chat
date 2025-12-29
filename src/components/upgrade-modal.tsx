@@ -12,6 +12,25 @@ interface UpgradeModalProps {
 
 type ModalView = "upgrade" | "activate" | "success";
 
+// Format license key with dashes: PRIV-XXXX-XXXX-XXXX
+function formatLicenseKey(value: string): string {
+	// Remove all non-alphanumeric characters
+	const cleaned = value.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+	
+	// Split into groups of 4
+	const groups: string[] = [];
+	for (let i = 0; i < cleaned.length && groups.length < 4; i += 4) {
+		groups.push(cleaned.slice(i, i + 4));
+	}
+	
+	return groups.join("-");
+}
+
+// Get raw key without formatting (for validation)
+function getRawLicenseKey(formatted: string): string {
+	return formatted.replace(/-/g, "");
+}
+
 export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) {
 	const [view, setView] = useState<ModalView>("upgrade");
 	const [email, setEmail] = useState("");
@@ -19,6 +38,12 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
 	const [generatedKey, setGeneratedKey] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState("");
+
+	// Handle license key input with auto-formatting
+	const handleLicenseKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const formatted = formatLicenseKey(e.target.value);
+		setLicenseKey(formatted);
+	};
 
 	if (!isOpen) return null;
 
@@ -56,8 +81,16 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
 	};
 
 	const handleActivate = async () => {
-		if (!licenseKey) {
-			setError("License key is required");
+		const rawKey = getRawLicenseKey(licenseKey);
+		
+		// Validate format: must be 16 characters (PRIV + 12 chars)
+		if (rawKey.length !== 16) {
+			setError("Invalid license key format. Expected: PRIV-XXXX-XXXX-XXXX");
+			return;
+		}
+
+		if (!rawKey.startsWith("PRIV")) {
+			setError("License key must start with PRIV");
 			return;
 		}
 
@@ -65,12 +98,14 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
 		setError("");
 
 		try {
-			const res = await client.license.validate.post({ licenseKey });
+			// Send formatted key with dashes
+			const formattedKey = formatLicenseKey(rawKey);
+			const res = await client.license.validate.post({ licenseKey: formattedKey });
 
 			if (res.status === 200 && res.data?.valid) {
-				setGeneratedKey(licenseKey);
+				setGeneratedKey(formattedKey);
 				setView("success");
-				onSuccess?.(licenseKey);
+				onSuccess?.(formattedKey);
 			} else {
 				setError("Invalid or expired license key");
 			}
@@ -166,10 +201,14 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
 							<input
 								type="text"
 								value={licenseKey}
-								onChange={(e) => setLicenseKey(e.target.value.toUpperCase())}
+								onChange={handleLicenseKeyChange}
 								placeholder="PRIV-XXXX-XXXX-XXXX"
-								className="w-full bg-zinc-950 border border-zinc-800 p-3 font-mono text-sm text-zinc-300 placeholder:text-zinc-600 focus:border-green-500/50 focus:outline-none"
+								maxLength={19}
+								className="w-full bg-zinc-950 border border-zinc-800 p-3 font-mono text-sm text-zinc-300 placeholder:text-zinc-600 focus:border-green-500/50 focus:outline-none tracking-wider"
 							/>
+							<p className="text-zinc-600 font-mono text-xs mt-1">
+								Auto-formatted as you type
+							</p>
 						</div>
 
 						{error && (

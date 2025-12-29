@@ -143,29 +143,66 @@ const rooms = new Elysia({ prefix: "/room" })
 	})
 	.get("/info", async ({ query }) => {
 		const { roomId } = query;
-		const meta = await redis.hgetall<{ hasPassword?: boolean; connected?: string[] }>(`meta:${roomId}`);
+		const meta = await redis.hgetall<{ hasPassword?: boolean | string; connected?: string[] }>(`meta:${roomId}`);
 		
-		if (!meta) {
+		if (!meta || Object.keys(meta).length === 0) {
 			return { exists: false };
 		}
+
+		const hasPassword = meta.hasPassword === true || meta.hasPassword === "true";
 		
 		return {
 			exists: true,
-			hasPassword: !!meta.hasPassword,
+			hasPassword,
 			participantCount: meta.connected?.length ?? 0,
 		};
 	}, {
 		query: z.object({ roomId: z.string() }),
 	})
-	.use(authMiddleware)
+	.post("/join", async ({ body, cookie }) => {
+		const { roomId } = body;
+		const existingToken = cookie["x-auth-token"]?.value as string | undefined;
+		
+		const meta = await redis.hgetall<{ connected?: string[]; hasPassword?: boolean | string }>(`meta:${roomId}`);
+		
+		if (!meta || Object.keys(meta).length === 0) {
+			return { success: false, error: "room-not-found" };
+		}
+
+		const connected = Array.isArray(meta.connected) ? meta.connected : [];
+
+		// Already connected
+		if (existingToken && connected.includes(existingToken)) {
+			return { success: true, token: existingToken, alreadyConnected: true };
+		}
+
+		// Room full
+		if (connected.length >= 5) {
+			return { success: false, error: "room-full" };
+		}
+
+		// Join room
+		const token = nanoid();
+		await redis.hset(`meta:${roomId}`, {
+			connected: [...connected, token],
+		});
+
+		return { success: true, token, alreadyConnected: false };
+	}, {
+		body: z.object({ roomId: z.string() }),
+	})
+	// TTL endpoint - public (no auth required, just returns time remaining)
 	.get(
 		"/ttl",
-		async ({ auth }) => {
-			const ttl = await redis.ttl(`meta:${auth.roomId}`);
+		async ({ query }) => {
+			const { roomId } = query;
+			const ttl = await redis.ttl(`meta:${roomId}`);
 			return { ttl: ttl > 0 ? ttl : 0 };
 		},
 		{ query: z.object({ roomId: z.string() }) }
 	)
+	// Protected endpoints (require auth)
+	.use(authMiddleware)
 	.delete("/", async ({ auth }) => {
 		await realtime.channel(auth.roomId).emit("chat.destroy", { isDestroyed: true });
 

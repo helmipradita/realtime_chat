@@ -18,9 +18,11 @@ export const authMiddleware = new Elysia({
       return { error: "Unauthorized" };
     }
   })
-  .derive({ as: "scoped" }, async ({ query, cookie }) => {
+  .derive({ as: "scoped" }, async ({ query, headers }) => {
     const roomId = query.roomId;
-    const token = cookie["x-auth-token"].value as string | undefined;
+    // Get token from Authorization header
+    const authHeader = headers["authorization"];
+    const token = authHeader?.replace("Bearer ", "");
 
     if (!roomId || !token) {
       throw new AuthError("Missing roomId or token.");
