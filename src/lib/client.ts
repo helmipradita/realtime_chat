@@ -13,8 +13,8 @@ export const client = treaty<App>(baseUrl, {
 	headers: () => {
 		const token = getAuthToken();
 		if (token) {
-			return { Authorization: `Bearer ${token}` };
+			return { Authorization: `Bearer ${token}` } as const;
 		}
-		return {};
+		return {} as Record<string, string>;
 	},
 }).api;

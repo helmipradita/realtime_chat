@@ -62,11 +62,12 @@ export interface LicenseData {
 	createdAt: number;
 	expiresAt: number; // timestamp
 	status: "active" | "expired" | "cancelled";
+	[key: string]: string | number; // Index signature for Redis compatibility
 }
 
 // Save license to Redis
 export async function saveLicense(licenseKey: string, data: LicenseData): Promise<void> {
-	await redis.hset(`license:${licenseKey}`, data);
+	await redis.hset(`license:${licenseKey}`, data as Record<string, unknown>);
 	// Also index by email for lookup
 	await redis.set(`license:email:${data.email}`, licenseKey);
 }
