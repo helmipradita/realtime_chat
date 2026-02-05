@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { MessageSquare, CreditCard, Info, Mail } from "lucide-react";
+import { MessageSquare, CreditCard, Info, Mail, HelpCircle, Monitor } from "lucide-react";
 
 interface NavbarProps {
-	currentPage?: "home" | "pricing" | "about" | "contact";
+	currentPage?: "home" | "pricing" | "about" | "contact" | "how-it-works" | "demo";
 }
 
 export function Navbar({ currentPage = "home" }: NavbarProps) {
@@ -22,6 +22,16 @@ export function Navbar({ currentPage = "home" }: NavbarProps) {
 						}`}
 					>
 						<MessageSquare className="w-4 h-4" /> ROOM
+					</Link>
+					<Link
+						href="/demo"
+						className={`text-sm font-mono flex items-center gap-2 ${
+							currentPage === "demo"
+								? "text-green-500"
+								: "text-zinc-400 hover:text-zinc-200"
+						}`}
+					>
+						<Monitor className="w-4 h-4" /> DEMO
 					</Link>
 					<Link
 						href="/pricing"

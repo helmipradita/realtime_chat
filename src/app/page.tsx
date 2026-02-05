@@ -10,7 +10,7 @@ import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { MessageSquare, CreditCard, Clock, Shield, Users, Zap, Eye, EyeOff } from "lucide-react";
+import { MessageSquare, CreditCard, Clock, Shield, Users, Zap, Eye, EyeOff, Monitor } from "lucide-react";
 
 const TTL_OPTIONS = [
 	{ label: "10 min", value: 10 * 60, tier: "free" },
@@ -291,6 +291,15 @@ function Lobby() {
 			{/* Features Section */}
 			<div className="border-t border-zinc-800 py-12">
 				<div className="max-w-4xl mx-auto px-4">
+					<div className="text-center mb-8">
+						<Link
+							href="/demo"
+							className="inline-flex items-center gap-2 text-green-500 font-mono text-sm hover:underline"
+						>
+							<Monitor className="w-4 h-4" />
+							View Product Demo & Screenshots →
+						</Link>
+					</div>
 					<div className="grid md:grid-cols-3 gap-8 text-center">
 						<div>
 							<div className="w-12 h-12 mx-auto mb-4 rounded-full border border-green-500/30 flex items-center justify-center">

@@ -20,11 +20,14 @@ export function Footer() {
 							<Link href="/" className="block text-zinc-500 hover:text-zinc-300 font-mono text-xs">
 								Home
 							</Link>
-							<Link href="/about" className="block text-zinc-500 hover:text-zinc-300 font-mono text-xs">
-								About
+							<Link href="/demo" className="block text-zinc-500 hover:text-zinc-300 font-mono text-xs">
+								Demo
 							</Link>
 							<Link href="/pricing" className="block text-zinc-500 hover:text-zinc-300 font-mono text-xs">
 								Pricing
+							</Link>
+							<Link href="/about" className="block text-zinc-500 hover:text-zinc-300 font-mono text-xs">
+								About
 							</Link>
 							<Link href="/contact" className="block text-zinc-500 hover:text-zinc-300 font-mono text-xs">
 								Contact
