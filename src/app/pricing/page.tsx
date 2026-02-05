@@ -5,6 +5,8 @@ import { useState } from "react";
 import { MessageSquare, CreditCard, QrCode, Smartphone } from "lucide-react";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { useLicense } from "@/hooks/use-license";
+import { Footer } from "@/components/footer";
+import { Navbar } from "@/components/navbar";
 
 const FAQ_ITEMS = [
 	{
@@ -36,21 +38,7 @@ export default function PricingPage() {
 
 	return (
 		<main className="min-h-screen bg-zinc-950 py-16 px-4">
-			<nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-				<div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-					<Link href="/" className="text-green-500 font-mono font-bold">
-						{">"}private_chat
-					</Link>
-					<div className="flex items-center gap-6">
-						<Link href="/" className="text-zinc-400 hover:text-zinc-200 text-sm font-mono flex items-center gap-2">
-							<MessageSquare className="w-4 h-4" /> ROOM
-						</Link>
-						<Link href="/pricing" className="text-green-500 text-sm font-mono flex items-center gap-2">
-							<CreditCard className="w-4 h-4" /> PRICING
-						</Link>
-					</div>
-				</div>
-			</nav>
+			<Navbar currentPage="pricing" />
 
 			<div className="max-w-4xl mx-auto pt-16">
 				<div className="text-center mb-12">
@@ -210,6 +198,8 @@ export default function PricingPage() {
 				onClose={() => setShowUpgradeModal(false)}
 				onSuccess={handleUpgradeSuccess}
 			/>
+
+			<Footer />
 		</main>
 	);
 }

@@ -4,6 +4,8 @@ import { useUsername } from "@/hooks/use-username";
 import { useLicense } from "@/hooks/use-license";
 import { client } from "@/lib/client";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { Footer } from "@/components/footer";
+import { Navbar } from "@/components/navbar";
 import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -84,28 +86,7 @@ function Lobby() {
 
 	return (
 		<main className="min-h-screen bg-zinc-950 flex flex-col">
-			{/* Header */}
-			<nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
-				<div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-					<Link href="/" className="text-green-500 font-mono font-bold">
-						{">"}_private_chat
-					</Link>
-					<div className="flex items-center gap-6">
-						<Link
-							href="/"
-							className="text-green-500 text-sm font-mono flex items-center gap-2"
-						>
-							<MessageSquare className="w-4 h-4" /> ROOM
-						</Link>
-						<Link
-							href="/pricing"
-							className="text-zinc-400 hover:text-zinc-200 text-sm font-mono flex items-center gap-2"
-						>
-							<CreditCard className="w-4 h-4" /> PRICING
-						</Link>
-					</div>
-				</div>
-			</nav>
+			<Navbar currentPage="home" />
 
 			{/* Main Content */}
 			<div className="flex-1 flex flex-col items-center justify-center p-4 pt-20">
@@ -348,6 +329,8 @@ function Lobby() {
 				onClose={() => setShowUpgradeModal(false)}
 				onSuccess={handleUpgradeSuccess}
 			/>
+
+			<Footer />
 		</main>
 	);
 }
