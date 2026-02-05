@@ -84,7 +84,7 @@ export default function TermsPage() {
 						<h2 className="text-xl font-mono text-white mb-4">6. Payment Terms</h2>
 						<p className="text-zinc-300 font-mono text-sm leading-relaxed">
 							Payments are processed securely through Xendit. We accept QRIS, credit/debit cards, and e-wallets. 
-							All prices are in USD. By subscribing, you authorize us to charge your payment method on a recurring basis.
+							All prices are in IDR (Indonesian Rupiah). By subscribing, you authorize us to charge your payment method on a recurring basis.
 						</p>
 					</section>
 

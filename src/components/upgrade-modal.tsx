@@ -316,7 +316,7 @@ export function UpgradeModal({ isOpen, onClose, onSuccess }: UpgradeModalProps) 
 						{/* Price */}
 						<div className="text-center mb-4">
 							<div className="font-mono">
-								<span className="text-2xl text-white">$4.99</span>
+								<span className="text-2xl text-white">Rp 75.000</span>
 								<span className="text-zinc-500 text-sm">/month</span>
 							</div>
 							<p className="text-zinc-600 text-xs font-mono mt-1">

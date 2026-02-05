@@ -56,7 +56,7 @@ export default function PricingPage() {
 						<div className="text-center mb-6">
 							<h2 className="text-zinc-400 font-mono text-sm mb-2">FREE</h2>
 							<div className="font-mono">
-								<span className="text-3xl text-white">$0</span>
+								<span className="text-3xl text-white">Rp 0</span>
 							</div>
 						</div>
 						<ul className="space-y-3 mb-6 font-mono text-sm">
@@ -99,7 +99,7 @@ export default function PricingPage() {
 						<div className="text-center mb-6 pt-2">
 							<h2 className="text-green-500 font-mono text-sm mb-2">PRO</h2>
 							<div className="font-mono">
-								<span className="text-3xl text-white">$4.99</span>
+								<span className="text-3xl text-white">Rp 75.000</span>
 								<span className="text-zinc-500 text-sm">/month</span>
 							</div>
 						</div>
